@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SMRT Orchestrator - docs run</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; line-height: 1.5; }
+  h1 { border-bottom: 2px solid #333; padding-bottom: 0.3rem; }
+  h2 { margin-top: 2rem; color: #444; }
+  .meta { background: #f4f4f4; padding: 0.8rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0; }
+  .card { background: #fafafa; border: 1px solid #e0e0e0; padding: 1rem; border-radius: 6px; }
+  .card .n { font-size: 1.8rem; font-weight: 600; }
+  .card .l { font-size: 0.85rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+  table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid #eee; }
+  th { background: #f8f8f8; font-weight: 600; }
+  .sev-high { color: #c0392b; font-weight: 600; }
+  .sev-medium { color: #d68910; font-weight: 600; }
+  .sev-low { color: #7f8c8d; }
+  .kind-bug { color: #c0392b; }
+  .kind-smell { color: #8e44ad; }
+  .kind-coverage_gap { color: #2980b9; }
+  .kind-note { color: #555; }
+  pre { background: #2d2d2d; color: #f8f8f2; padding: 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+  .final { background: #eef6ff; border-left: 4px solid #2980b9; padding: 0.8rem 1rem; border-radius: 0 6px 6px 0; }
+</style>
+</head>
+<body>
+<h1>SMRT Orchestrator - docs</h1>
+<div class="meta">
+  <strong>Repo:</strong> C:\Users\Rwdor\Downloads\smrt-orchestrator\fastapi-demo-target<br>
+  <strong>Model:</strong> gpt-5.4-nano-2026-03-17<br>
+  <strong>Run:</strong> 2026-04-23 14:32:20
+</div>
+
+<div class="grid">
+  <div class="card"><div class="n">16</div><div class="l">Iterations</div></div>
+  <div class="card"><div class="n">7</div><div class="l">Changes applied</div></div>
+  <div class="card"><div class="n">0</div><div class="l">Rejected</div></div>
+  <div class="card"><div class="n">0</div><div class="l">Findings</div></div>
+  <div class="card"><div class="n">106994</div><div class="l">Tokens</div></div>
+</div>
+
+
+<h2>Codebase at a glance</h2>
+<div class="grid">
+  <div class="card"><div class="n">10</div><div class="l">Python files</div></div>
+  <div class="card"><div class="n">24</div><div class="l">Symbols</div></div>
+  <div class="card"><div class="n">8</div><div class="l">FastAPI endpoints</div></div>
+  <div class="card"><div class="n">21</div><div class="l">Undocumented</div></div>
+  <div class="card"><div class="n">7</div><div class="l">Untested modules</div></div>
+</div>
+
+
+
+
+
+<h2>Applied changes</h2>
+<table>
+  <thead><tr><th>File</th><th>Confidence</th><th>Reason</th></tr></thead>
+  <tbody>
+  
+    <tr><td><code>app/database.py</code></td><td>0.90</td><td>Add Google-style docstrings to all public data-access functions without altering logic.</td></tr>
+  
+    <tr><td><code>app/models.py</code></td><td>0.90</td><td>Add Google-style docstrings to public model classes and request models without changing fields.</td></tr>
+  
+    <tr><td><code>app/routers/customers.py</code></td><td>0.72</td><td>Add Google-style docstrings to customer endpoints and document HTTP contract.</td></tr>
+  
+    <tr><td><code>app/routers/orders.py</code></td><td>0.80</td><td>Add Google-style docstrings to order endpoints and document HTTP methods, params, and responses.</td></tr>
+  
+    <tr><td><code>app/services/pricing.py</code></td><td>0.86</td><td>Add Google-style docstrings to public pricing functions that were missing full docs.</td></tr>
+  
+    <tr><td><code>app/services/status.py</code></td><td>0.86</td><td>Add Google-style docstrings to public status helper functions that were missing them.</td></tr>
+  
+    <tr><td><code>app/main.py</code></td><td>0.90</td><td>Add Google-style docstring to the health endpoint.</td></tr>
+  
+  </tbody>
+</table>
+
+
+
+
+<h2>Agent's final summary</h2>
+<div class="final">Processed meaningful undocumented items and added Google-style docstrings to the following files/items:
+
+- `app/database.py`
+  - `get_customer`
+  - `get_order`
+  - `list_orders_for_customer`
+  - `save_order`
+  - `delete_order`
+- `app/main.py`
+  - endpoint `health`
+- `app/models.py`
+  - classes: `Customer`, `OrderItem`, `Order`, `CreateOrderRequest`, `StatusUpdateRequest`
+- `app/routers/customers.py`
+  - endpoint `get_customer`
+  - endpoint `get_loyalty_tier`
+- `app/routers/orders.py`
+  - endpoints: `create_order`, `get_order`, `list_customer_orders`, `update_status`, `cancel_order`
+- `app/services/pricing.py`
+  - `calculate_bulk_discount`
+  - `calculate_total`
+- `app/services/status.py`
+  - `can_transition`
+  - `valid_next_states`
+
+If you want, I can also run a search to confirm there are no remaining public items without docstrings.</div>
+
+</body>
+</html>
