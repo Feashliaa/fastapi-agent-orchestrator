@@ -45,6 +45,8 @@ orchestrator --help
 
 ## How to run it
 
+Sample reports from a reference run on a toy FastAPI app are in `reports/sample/`.
+
 The orchestrator is a CLI tool that operates on a **separate** FastAPI codebase (your "target"). You run it from the orchestrator's directory and point it at the target with `--repo`.
 
 **Typical flow for evaluating one branch:**
