@@ -1,9 +1,33 @@
 # pycache
 __pycache__/
+*.pyc
+
+# venv
+.venv/
+venv/
 
 # env files
 .env
 
+# build artifacts
+*.egg-info/
+build/
+dist/
+
+# tooling caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# reports — keep only the sample
 reports/*
 !reports/sample/
 !reports/sample/**
