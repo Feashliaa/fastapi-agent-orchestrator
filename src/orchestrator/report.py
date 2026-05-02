@@ -124,6 +124,22 @@ def write_report(
     result: AgentResult,
     audit: RepoAudit | None = None,
 ) -> None:
+    """Render and write an HTML report file.
+
+    Args:
+        path: Output file path (the parent directory will be created).
+        mode: Run mode label shown in the report title.
+        repo: Repository path shown in the report metadata.
+        model: Model name shown in the report metadata.
+        result: Agent execution result used to populate the report.
+        audit: Optional repository audit data (e.g., undocumented symbols).
+
+    Returns:
+        None.
+
+    Raises:
+        OSError: If writing to ``path`` fails.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     html = _TEMPLATE.render(
         mode=mode,

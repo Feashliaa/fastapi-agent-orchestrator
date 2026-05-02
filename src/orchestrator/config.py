@@ -23,6 +23,17 @@ DEFAULT_MODELS = {
 
 @dataclass
 class Config:
+    """Configuration for orchestrating an agent run.
+
+    Attributes:
+        provider: Provider name (e.g., ``anthropic`` or ``openai``).
+        api_key: Provider API key.
+        model: Provider model id.
+        max_iterations: Maximum number of provider turns to execute.
+        auto_apply_threshold: Confidence threshold used by the change gate.
+        repo_root: Absolute path to the target repository.
+    """
+
     provider: str
     api_key: str
     model: str
@@ -38,6 +49,20 @@ class Config:
         provider_override: str | None = None,
         model_override: str | None = None,
     ) -> "Config":
+        """Create a :class:`Config` from environment variables.
+
+        Args:
+            repo_root: Optional repository root path; defaults to CWD.
+            provider_override: Optional override for the provider.
+            model_override: Optional override for the model.
+
+        Returns:
+            A fully populated :class:`Config`.
+
+        Raises:
+            RuntimeError: If the provider is unknown or the required API key is
+                missing.
+        """
         provider = (
             provider_override
             or os.environ.get("ORCHESTRATOR_PROVIDER", "anthropic")
