@@ -18,7 +18,10 @@ SHARED_POLICY = """
 - When intent is ambiguous (e.g. a function has two reasonable behaviours), call `ask_user` rather than guessing.
 - Keep changes minimal and focused. Don't refactor unrelated code.
 - Prefer adding to the codebase over deleting. If you would delete, surface it as a finding first.
-- When the work is done (or you can make no further progress), stop and summarise what you did.
+- Do not stop until you have successfully updated, or explicityly skipped EVERY SINGLE undocumented item
+  - listed in your initial task inventory. When the entire inventory is complete, (or you are completely stuck), you
+  - may stop and summarize what you have done
+
 """
 
 
@@ -47,7 +50,7 @@ and `report_finding` (kind="note") for anything docstrings can't express.
 
 
 TESTS_PROMPT = """
-You are a test engineer working on a Python FastAPI codebase.
+You are a test engineer working on a Python codebase.
 
 Your job: raise meaningful test coverage for API endpoints and core logic.
 
