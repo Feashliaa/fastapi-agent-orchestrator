@@ -20,6 +20,20 @@ console = Console()
 
 @dataclass
 class AgentResult:
+    """Holds the outcome of a single agent run.
+
+    Attributes:
+        final_text: The agent's final assistant message text.
+        iterations: Number of provider turns executed.
+        findings: Collected findings recorded via the tool interface.
+        applied_changes: Change records that were approved and applied.
+        rejected_changes: Change records that were rejected.
+        input_tokens: Provider-reported prompt/input token count.
+        output_tokens: Provider-reported completion/output token count.
+        provider: Provider name used for the run.
+        model: Model id used for the run.
+    """
+
     final_text: str
     iterations: int
     findings: list[dict[str, Any]] = field(default_factory=list)
@@ -32,7 +46,15 @@ class AgentResult:
 
 
 class Agent:
+    """Run the agent loop to complete a task using a configured provider."""
+
     def __init__(self, config: Config, auto_approve: bool = False):
+        """Create an agent.
+
+        Args:
+            config: Configuration including provider selection and iteration cap.
+            auto_approve: If True, allow all change mutations to be applied.
+        """
         self.config = config
         self.provider: Provider = build_provider(config.provider, config.api_key, config.model)
         self.gate = ChangeGate(config.auto_apply_threshold, auto_approve=auto_approve)
@@ -40,6 +62,16 @@ class Agent:
         self.executor = ToolExecutor(config.repo_root, self.gate, self.findings)
 
     def run(self, system_prompt: str, task: str) -> AgentResult:
+        """Run the provider/tool loop until completion.
+
+        Args:
+            system_prompt: Provider system prompt to seed the conversation.
+            task: User task/instruction prompt.
+
+        Returns:
+            An :class:`AgentResult` describing the final assistant output and
+            any collected findings/changes.
+        """
         messages: list[Any] = [{"role": "user", "content": task}]
         input_tokens = output_tokens = 0
 
@@ -95,6 +127,7 @@ class Agent:
         )
 
     def _finalize(self, final_text: str, iters: int, in_tok: int, out_tok: int) -> AgentResult:
+        """Build an :class:`AgentResult` from internal run state."""
         return AgentResult(
             final_text=final_text,
             iterations=iters,
@@ -109,6 +142,15 @@ class Agent:
 
 
 def _summary(d: dict[str, Any], limit: int = 80) -> str:
+    """Render a compact, single-line summary of a tool arguments dict.
+
+    Args:
+        d: Dictionary of tool arguments.
+        limit: Max length of returned string.
+
+    Returns:
+        A compact string like ``key=value, key2=value2`` clipped to ``limit``.
+    """
     parts = []
     for k, v in d.items():
         s = str(v).replace("\n", "\\n")

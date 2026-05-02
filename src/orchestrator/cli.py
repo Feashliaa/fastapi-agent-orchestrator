@@ -37,6 +37,19 @@ YesOpt = typer.Option(False, "--yes", "-y", help="Auto-approve all changes.")
 
 
 def _load(repo: Path | None, provider: str | None, model: str | None) -> Config:
+    """Load orchestrator configuration.
+
+    Args:
+        repo: Repository root path (defaults to current working directory).
+        provider: Optional provider override.
+        model: Optional model override.
+
+    Returns:
+        A :class:`~orchestrator.config.Config` instance.
+
+    Raises:
+        typer.Exit: If configuration loading fails.
+    """
     try:
         cfg = Config.load(repo, provider_override=provider, model_override=model)
         console.print(f"[dim]Using {cfg.provider}:{cfg.model}[/dim]")
@@ -47,12 +60,26 @@ def _load(repo: Path | None, provider: str | None, model: str | None) -> Config:
 
 
 def _fmt_endpoint(s) -> str:
+    """Format a scanned FastAPI endpoint for human display.
+
+    Args:
+        s: Scanned symbol describing an endpoint.
+
+    Returns:
+        A human-readable string containing the HTTP method, route, file, and line.
+    """
     method = (s.http_method or "?").upper()
     route = s.route or ""
     return f"{method} {route} ({s.file}:{s.line})"
 
 
 def _summarise(mode: str, result: AgentResult) -> None:
+    """Print a summary table for an agent run to stdout.
+
+    Args:
+        mode: Run mode label used in the table title.
+        result: Agent execution result to summarise.
+    """
     t = Table(title=f"{mode} - run summary ({result.provider}:{result.model})", show_header=False)
     t.add_row("Iterations", str(result.iterations))
     t.add_row("Changes applied", str(len(result.applied_changes)))
@@ -69,7 +96,17 @@ def audit(
     model: Optional[str] = ModelOpt,
     report: Optional[Path] = ReportOpt,
 ):
-    """Read-only pass: scan the repo and let the agent flag risks."""
+    """Read-only pass: scan the repo and let the agent flag risks.
+
+    Args:
+        repo: Repository root to scan.
+        provider: Optional provider override.
+        model: Optional model override.
+        report: Optional HTML report output path.
+
+    Returns:
+        None.
+    """
     cfg = _load(repo, provider, model)
     console.print(f"[bold]Auditing[/bold] {cfg.repo_root}")
     audit_data = scan_repo(cfg.repo_root)
@@ -110,7 +147,18 @@ def docs(
     yes: bool = YesOpt,
     report: Optional[Path] = ReportOpt,
 ):
-    """Generate/update docstrings."""
+    """Generate or update docstrings.
+
+    Args:
+        repo: Repository root to scan.
+        provider: Optional provider override.
+        model: Optional model override.
+        yes: Auto-approve all change mutations when True.
+        report: Optional HTML report output path.
+
+    Returns:
+        None.
+    """
     cfg = _load(repo, provider, model)
     audit_data = scan_repo(cfg.repo_root)
     task = (
@@ -135,7 +183,18 @@ def tests(
     yes: bool = YesOpt,
     report: Optional[Path] = ReportOpt,
 ):
-    """Generate pytest test cases for endpoints and core logic."""
+    """Generate pytest test cases for endpoints and core logic.
+
+    Args:
+        repo: Repository root to scan.
+        provider: Optional provider override.
+        model: Optional model override.
+        yes: Auto-approve all change mutations when True.
+        report: Optional HTML report output path.
+
+    Returns:
+        None.
+    """
     cfg = _load(repo, provider, model)
     audit_data = scan_repo(cfg.repo_root)
     endpoints = "\n".join(f"- {_fmt_endpoint(s)}" for s in audit_data.endpoints)
@@ -162,7 +221,18 @@ def bugs(
     yes: bool = YesOpt,
     report: Optional[Path] = ReportOpt,
 ):
-    """Detect and (optionally) fix trivial logical bugs."""
+    """Detect and optionally fix trivial logical bugs.
+
+    Args:
+        repo: Repository root to scan.
+        provider: Optional provider override.
+        model: Optional model override.
+        yes: Auto-approve all change mutations when True.
+        report: Optional HTML report output path.
+
+    Returns:
+        None.
+    """
     cfg = _load(repo, provider, model)
     audit_data = scan_repo(cfg.repo_root)
     task = (
@@ -186,7 +256,18 @@ def all_cmd(
     yes: bool = YesOpt,
     report_dir: Optional[Path] = typer.Option(None, "--report-dir"),
 ):
-    """Run docs → tests → bugs in sequence."""
+    """Run docs → tests → bugs in sequence.
+
+    Args:
+        repo: Repository root to scan.
+        provider: Optional provider override.
+        model: Optional model override.
+        yes: Auto-approve all change mutations when True.
+        report_dir: Optional directory for per-mode HTML reports.
+
+    Returns:
+        None.
+    """
     if report_dir:
         report_dir.mkdir(parents=True, exist_ok=True)
     for mode in ("docs", "tests", "bugs"):
@@ -203,7 +284,17 @@ def watch(
     model: Optional[str] = ModelOpt,
     yes: bool = YesOpt,
 ):
-    """Watch the repo; on any .py change, run the docs agent for that file."""
+    """Watch the repo and run the docs agent on Python changes.
+
+    Args:
+        repo: Repository root to watch.
+        provider: Optional provider override.
+        model: Optional model override.
+        yes: Auto-approve all change mutations when True.
+
+    Returns:
+        None.
+    """
     from watchfiles import watch as _watch
     cfg = _load(repo, provider, model)
     console.print(f"[bold]Watching[/bold] {cfg.repo_root} (Ctrl-C to stop)")

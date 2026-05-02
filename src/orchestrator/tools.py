@@ -140,12 +140,31 @@ class ChangeGate:
     """Centralises the confidence/approval logic for mutations."""
 
     def __init__(self, threshold: float, auto_approve: bool = False):
+        """Initialize the approval gate.
+
+        Args:
+            threshold: Minimum confidence required for automatic approval.
+            auto_approve: Approve all changes without prompting when ``True``.
+        """
         self.threshold = threshold
         self.auto_approve = auto_approve
         self.applied: list[dict[str, Any]] = []
         self.rejected: list[dict[str, Any]] = []
 
     def decide(self, path: str, old: str, new: str, confidence: float, reason: str) -> bool:
+        """Decide whether to apply a proposed change.
+
+        Args:
+            path: Repository-relative path being changed.
+            old: Existing file contents.
+            new: Proposed replacement contents.
+            confidence: Model confidence for the change.
+            reason: Human-readable justification for the change.
+
+        Returns:
+            ``True`` if the change is approved and should be applied, otherwise
+            ``False``.
+        """
         record = {"path": path, "confidence": confidence, "reason": reason}
         if self.auto_approve or confidence >= self.threshold:
             self.applied.append(record)
@@ -173,18 +192,53 @@ class ChangeGate:
 # ---------- Executors ----------
 
 class ToolExecutor:
+    """Execute tool calls on the local filesystem and process runner.
+
+    ToolExecutor maps tool names (e.g., ``list_directory``) to private
+    handler methods (e.g., ``_t_list_directory``). It enforces that all file
+    operations stay within ``repo_root``.
+    """
+
     def __init__(self, repo_root: Path, gate: ChangeGate, findings: list[dict[str, Any]]):
+        """Create a new tool executor.
+
+        Args:
+            repo_root: Root directory allowed for filesystem operations.
+            gate: ChangeGate controlling when write operations are approved.
+            findings: Mutable list that will be appended with report_finding
+                records.
+        """
         self.repo_root = repo_root
         self.gate = gate
         self.findings = findings
 
     def _safe_path(self, relative: str) -> Path:
+        """Resolve a relative path within ``repo_root``.
+
+        Args:
+            relative: Path relative to ``repo_root``.
+
+        Returns:
+            The resolved absolute path.
+
+        Raises:
+            ValueError: If the resolved path escapes the repository root.
+        """
         target = (self.repo_root / relative).resolve()
         if not str(target).startswith(str(self.repo_root)):
             raise ValueError(f"Path {relative} escapes repo root")
         return target
 
     def dispatch(self, name: str, args: dict[str, Any]) -> str:
+        """Dispatch a tool call by name.
+
+        Args:
+            name: Tool name as emitted by the LLM/provider.
+            args: Tool arguments.
+
+        Returns:
+            A string containing the tool result.
+        """
         fn: Callable[[dict[str, Any]], str] | None = getattr(self, f"_t_{name}", None)
         if fn is None:
             return f"Unknown tool: {name}"
@@ -193,6 +247,15 @@ class ToolExecutor:
     # individual tools - prefix _t_ to map from tool name
 
     def _t_list_directory(self, args: dict[str, Any]) -> str:
+        """List visible entries in a directory under the repository root.
+
+        Args:
+            args: Tool arguments containing ``path``.
+
+        Returns:
+            Newline-separated directory entries, ``(empty)``, or an error
+            message if the target does not exist or is a file.
+        """
         target = self._safe_path(args["path"])
         if not target.exists():
             return f"Not found: {args['path']}"
@@ -204,6 +267,15 @@ class ToolExecutor:
         return "\n".join(entries) or "(empty)"
 
     def _t_read_file(self, args: dict[str, Any]) -> str:
+        """Read a UTF-8 file and return its contents.
+
+        Args:
+            args: Tool arguments containing ``path``.
+
+        Returns:
+            File text, a truncated prefix for very large files, or an error
+            message if the target is missing or not text-readable.
+        """
         target = self._safe_path(args["path"])
         if not target.exists():
             return f"Not found: {args['path']}"
@@ -217,6 +289,15 @@ class ToolExecutor:
         return text
 
     def _t_search_code(self, args: dict[str, Any]) -> str:
+        """Search Python files for a regular expression.
+
+        Args:
+            args: Tool arguments containing ``pattern`` and optional ``path``.
+
+        Returns:
+            Matching ``grep`` output, ``(no matches)``, or a truncated list of
+            matches when the result set is large.
+        """
         pattern = args["pattern"]
         scope = self._safe_path(args.get("path", "."))
         cmd = ["grep", "-rnE", "--include=*.py", pattern, str(scope)]
@@ -229,6 +310,15 @@ class ToolExecutor:
         return out
 
     def _t_write_file(self, args: dict[str, Any]) -> str:
+        """Write a file after passing the change gate.
+
+        Args:
+            args: Tool arguments containing ``path``, ``content``,
+                ``confidence``, and ``reason``.
+
+        Returns:
+            A success, no-op, or rejection message describing the write.
+        """
         path = args["path"]
         content = args["content"]
         confidence = float(args["confidence"])
@@ -244,6 +334,14 @@ class ToolExecutor:
         return f"Wrote {path} ({len(content)} bytes)"
 
     def _t_run_tests(self, args: dict[str, Any]) -> str:
+        """Run the test suite with pytest.
+
+        Args:
+            args: Tool arguments containing an optional ``path``.
+
+        Returns:
+            Exit code plus captured stdout and stderr.
+        """
         path = args.get("path", "")
         cmd = ["python", "-m", "pytest", "-q", "--tb=short"]
         if path:
@@ -252,17 +350,44 @@ class ToolExecutor:
         return f"exit={result.returncode}\n--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
 
     def _t_run_linter(self, args: dict[str, Any]) -> str:
+        """Run Ruff over the repository.
+
+        Args:
+            args: Unused tool arguments.
+
+        Returns:
+            Ruff JSON output, or ``(no issues)`` when the command returns no
+            stdout.
+        """
         cmd = ["ruff", "check", "--output-format=json", str(self.repo_root)]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         # ruff returns non-zero when it finds issues; that's fine
         return result.stdout or "(no issues)"
 
     def _t_ask_user(self, args: dict[str, Any]) -> str:
+        """Prompt the human operator and return the reply.
+
+        Args:
+            args: Tool arguments containing ``question``.
+
+        Returns:
+            The user's reply, or ``(no answer)`` if they submit an empty
+            response.
+        """
         console.rule("[cyan]Agent has a question[/cyan]")
         console.print(args["question"])
         reply = console.input("[bold cyan]your answer >[/bold cyan] ")
         return reply or "(no answer)"
 
     def _t_report_finding(self, args: dict[str, Any]) -> str:
+        """Record a finding for the final report.
+
+        Args:
+            args: Finding payload containing ``kind``, ``severity``, and
+                ``summary``.
+
+        Returns:
+            A confirmation string describing the recorded finding.
+        """
         self.findings.append(args)
         return f"Recorded {args['kind']} ({args['severity']}): {args['summary']}"

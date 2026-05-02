@@ -15,6 +15,19 @@ from pathlib import Path
 
 @dataclass
 class Symbol:
+    """Represent a discovered symbol in the repository.
+
+    Attributes:
+        name: The function/class name.
+        kind: Symbol category.
+        file: Repository-relative file path.
+        line: 1-based line number where the symbol starts.
+        has_docstring: Whether the symbol has a docstring.
+        is_async: Whether the symbol is declared as async.
+        http_method: HTTP method for endpoints (e.g., "get"), otherwise None.
+        route: Route path for endpoints (e.g., "/health"), otherwise None.
+    """
+
     name: str
     kind: str  # "function" | "async_function" | "class" | "endpoint"
     file: str
@@ -27,6 +40,15 @@ class Symbol:
 
 @dataclass
 class FileAudit:
+    """Audit results for a single file.
+
+    Attributes:
+        path: Repository-relative file path.
+        symbols: All discovered symbols within the file.
+        has_test_file: True if the repository has a corresponding test module.
+        loc: Approximate lines of code counted as number of newline characters.
+    """
+
     path: str
     symbols: list[Symbol] = field(default_factory=list)
     has_test_file: bool = False
@@ -35,22 +57,28 @@ class FileAudit:
 
 @dataclass
 class RepoAudit:
+    """Aggregate audit information across the repository."""
+
     files: list[FileAudit] = field(default_factory=list)
 
     @property
     def total_symbols(self) -> int:
+        """Return the total number of discovered symbols across all files."""
         return sum(len(f.symbols) for f in self.files)
 
     @property
     def undocumented(self) -> list[Symbol]:
+        """Return symbols that are missing docstrings."""
         return [s for f in self.files for s in f.symbols if not s.has_docstring]
 
     @property
     def endpoints(self) -> list[Symbol]:
+        """Return symbols that were detected as FastAPI endpoints."""
         return [s for f in self.files for s in f.symbols if s.kind == "endpoint"]
 
     @property
     def untested_files(self) -> list[FileAudit]:
+        """Return files that contain symbols but have no corresponding test file."""
         return [f for f in self.files if f.symbols and not f.has_test_file]
 
 
@@ -58,7 +86,18 @@ HTTP_DECORATORS = {"get", "post", "put", "delete", "patch", "options", "head"}
 
 
 def _extract_route(decorator: ast.expr) -> tuple[str | None, str | None]:
-    """Return (http_method, route) if decorator is @router.get('/x'), else (None, None)."""
+    """Extract HTTP method and route string from a decorator expression.
+
+    This only supports decorator shapes like 
+    ``@router.get('/x')`` where the first positional argument is a string.
+
+    Args:
+        decorator: AST expression representing a decorator.
+
+    Returns:
+        A tuple of (http_method, route). If the decorator is not recognized as an
+        HTTP endpoint decorator, returns (None, None).
+    """
     if not isinstance(decorator, ast.Call):
         return None, None
     func = decorator.func
@@ -76,6 +115,15 @@ def _extract_route(decorator: ast.expr) -> tuple[str | None, str | None]:
 
 
 def _audit_file(path: Path, repo_root: Path) -> FileAudit:
+    """Audit a single Python file for symbols and docstrings.
+
+    Args:
+        path: Path to the Python file to audit.
+        repo_root: Root directory of the repository, used to compute relative paths.
+
+    Returns:
+        A :class:`FileAudit` instance.
+    """
     rel = path.relative_to(repo_root).as_posix()
     audit = FileAudit(path=rel)
     try:
@@ -126,7 +174,20 @@ def _audit_file(path: Path, repo_root: Path) -> FileAudit:
 
 
 def scan_repo(repo_root: Path, ignore: set[str] | None = None) -> RepoAudit:
-    """Walk the repo, parse every .py file, return a structured audit."""
+    """Scan the repository and return an audit.
+
+    The scanner walks all ``.py`` files under ``repo_root`` (excluding a default
+    ignore list), parses them with :mod:`ast`, and reports symbols and
+    whether they have docstrings.
+
+    Args:
+        repo_root: Root directory to scan.
+        ignore: Optional set of directory-name fragments to exclude.
+
+    Returns:
+        A :class:`RepoAudit` containing per-file symbol lists and derived
+        properties (e.g., undocumented symbols, endpoints).
+    """
     ignore = ignore or {".venv", "venv", "__pycache__", ".git", "node_modules", "build", "dist"}
     files: list[FileAudit] = []
     all_py = [
