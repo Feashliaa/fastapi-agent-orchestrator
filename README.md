@@ -12,7 +12,7 @@ Given a FastAPI codebase, the orchestrator runs three modes:
 - **bugs** - identifies and fixes trivial logical bugs (off-by-one, missing `None` checks, wrong HTTP status codes, mishandled async, illegal state transitions).
 - **tests** - generates pytest coverage using `pytest-asyncio` + `httpx.AsyncClient` for async endpoints.
 
-It does this through a real tool-use loop - the model navigates the repo with `read_file`, `list_directory`, `search_code`, `run_tests`, `run_linter`, and mutates files through a confidence-gated `write_file`. Low-confidence changes prompt you for approval; high-confidence changes auto-apply.
+It does this through a real tool-use loop/ ReAct Loop - the model navigates the repo with `read_file`, `list_directory`, `search_code`, `run_tests`, `run_linter`, and mutates files through a confidence-gated `write_file`. Low-confidence changes prompt you for approval; high-confidence changes auto-apply.
 
 ## Install
 
@@ -45,7 +45,7 @@ orchestrator --help
 
 ## How to run it
 
-Sample reports from a reference run on a toy FastAPI app are in `reports/sample/`.
+Sample reports from a reference run on a simple FastAPI app are located in the `reports/sample/` directory.
 
 The orchestrator is a CLI tool that operates on a **separate** FastAPI codebase (your "target"). You run it from the orchestrator's directory and point it at the target with `--repo`.
 
@@ -113,23 +113,23 @@ Default models: Anthropic → `claude-sonnet-4-6`, OpenAI → `gpt-4o-mini`.
 
 ## Design decisions
 
-**CLI, not a daemon.** A file-watcher is available (`orchestrator watch`), but the primary interface is a one-shot CLI. Reviewers need deterministic, inspectable runs against multiple branches - a persistent background process is the wrong shape for that.
+**CLI, not a daemon.** A file-watcher is available (`orchestrator watch`), but the primary interface is a one-shot CLI. Reviewers need deterministic, inspectable runs against multiple branches - a persistent background process is the wrong shape for that, which is why a daemon wasn't to be used.
 
-**Real tool-use loop, not prompt-stuffing.** The model runs a genuine multi-turn tool-use conversation. It navigates the repo, reads real files, runs real tests, and gets real output back. Not a chain of single-shot prompts; the agent reasons across iterations.
+**Real tool-use loop, not prompt-stuffing.** The model runs a genuine multi-turn tool-use conversation. It navigates the repo, reads real files, runs real tests, and gets real output back. Not a chain of single-shot prompts; the agent reasons across iterations and builds a more thorough solution, while being more cost efficient than prompt stuffing.
 
-**Provider-agnostic.** `providers.py` defines a `Provider` interface with two implementations (`AnthropicProvider`, `OpenAIProvider`). The agent loop doesn't care which is underneath. Switching is a flag; adding Gemini or a local model is a new subclass.
+**Provider-agnostic.** `providers.py` defines a `Provider` interface with two implementations (`AnthropicProvider`, `OpenAIProvider`). The agent loop doesn't care which is underneath, as it truly doesn't matter. Switching is a flag; adding Gemini or a local model is a new subclass.
 
 **Confidence-gated mutations.** Every `write_file` call must include a confidence score in `[0,1]` and a one-sentence reason. `ChangeGate` applies changes ≥ 0.85 automatically and routes the rest through a human review (unified diff in terminal, y/n prompt). This directly addresses the spec's "knows when it needs a human's okay" line and makes the agent's reasoning auditable.
 
-**AST grounding.** Before the LLM sees anything, `scanner.py` walks the repo with `ast` and produces a structured inventory: FastAPI endpoints (with HTTP method and route), undocumented symbols, modules without a matching test file. That inventory is injected into the agent's first message, so it cannot hallucinate "I documented the FooBar endpoint" when no such endpoint exists.
+**AST grounding.** Before the LLM sees anything, `scanner.py` walks the repo with `ast` and produces a structured inventory: FastAPI endpoints (with HTTP method and route), undocumented symbols - meaning functions, asynchronous or not. as well as classes and endpoins, and modules without a matching test file. That inventory is applied into the agent's first message, so it cannot hallucinate "I documented the FooBar endpoint" when no such endpoint actually exists.
 
 **Three prompts, one engine.** The docs, bugs, and tests modes share the same tool loop - what differs is the system prompt and the auto-injected worklist. Prompts live in `prompts.py` for easy iteration.
 
-**Pipeline order: docs → bugs → tests.** Running bugs before tests avoids a chicken-and-egg problem. If tests are written against current (possibly buggy) behavior, they codify the bugs, and bugs-mode can't fix anything without breaking them. With this ordering, bugs-mode operates on cleaner code, and tests-mode writes tests against corrected behavior.
+**Pipeline order: docs → bugs → tests.** Running bugs before tests avoids a chicken-and-egg problem. If tests are written against current (possibly buggy) behavior, they codify the bugs, and bugs-mode can't fix anything without breaking them. With this ordering, bugs-mode operates on cleaner code, and tests-mode writes tests against corrected behavior. However, depending on how you set up the prompts, the order could be shifted.
 
 **FastAPI-aware test generation.** The tests prompt mandates `pytest-asyncio` + `httpx.AsyncClient` with `ASGITransport` for async endpoints. A common failure mode is using sync `TestClient` on async routes and getting confusing errors. Tautological tests (`assert x is not None`) are explicitly disallowed.
 
-**Findings, not just fixes.** The `report_finding` tool lets the agent record things it noticed but chose not to act on (design smells, ambiguous bugs, coverage gaps). These land in the HTML report alongside applied/rejected changes and the agent's final summary.
+**Findings, not just fixes.** The `report_finding` tool lets the agent record things it noticed but chose not to act on (poor design/architecture, ambiguous bugs, coverage gaps). These land in the HTML report alongside applied/rejected changes and the agent's final summary.
 
 **HTML report.** Every mode produces a standalone report: counts, findings with severity, applied changes, rejected changes with confidence scores, and the agent's final summary.
 
@@ -151,7 +151,7 @@ tests/
 
 ## Model notes
 
-Tested end-to-end against OpenAI's `gpt-5.4-nano-2026-03-17`: a full `all` run on a small FastAPI codebase typically costs under $0.15 and converges in 30–50 total iterations across the three modes. Weaker models (e.g. `gpt-4o-mini`) occasionally get stuck in syntax-fixup loops; stronger reasoning models produce noticeably cleaner output. Anthropic's Sonnet tier is the reference target for highest-quality results.
+Tested end-to-end against OpenAI's `gpt-5.4-nano-2026-03-17`: a full `all` run on a small FastAPI codebase typically costs under $0.15 and converges in 30–50 total iterations across the three modes. Weaker models (e.g. `gpt-4o-mini`) occasionally get stuck in syntax-fixup loops; stronger reasoning models produce noticeably cleaner output. Anthropic's Sonnet tier is the reference target for highest-quality results, but no Anthropic agent was truly tested.
 
 ## Out of scope
 
