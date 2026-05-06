@@ -13,7 +13,7 @@ SHARED_POLICY = """
 - Before writing a file, read it first (unless creating new).
 - Every call to `write_file` must include an honest confidence score in [0,1] and a one-sentence reason.
   - >=0.85: you are confident the change is correct and low-risk.
-  - 0.6–0.85: plausible but benefits from human review.
+  - 0.6-0.85: plausible but benefits from human review.
   - <0.6: do not write; instead use `ask_user` or `report_finding`.
 - When intent is ambiguous (e.g. a function has two reasonable behaviours), call `ask_user` rather than guessing.
 - Keep changes minimal and focused. Don't refactor unrelated code.
