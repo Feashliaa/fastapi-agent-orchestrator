@@ -61,7 +61,7 @@ cd /path/to/fastapi-agent-orchestrator
 orchestrator all --repo /path/to/your/target-repo --yes --report-dir reports/base/
 ```
 
-`orchestrator all` runs three modes in sequence: **docs → bugs → tests**. It writes changes directly to files in the target repo and drops three HTML reports into `reports/base/`.
+`orchestrator all` runs three modes in sequence: **docs → tests → bugs**. It writes changes directly to files in the target repo and drops three HTML reports into `reports/base/`.
 
 **For each branch you want to evaluate**, repeat: check out the branch in the target, rerun `orchestrator all` with a distinct `--report-dir`.
 
@@ -125,7 +125,7 @@ Default models: Anthropic → `claude-sonnet-4-6`, OpenAI → `gpt-4o-mini`.
 
 **Three prompts, one engine.** The docs, bugs, and tests modes share the same tool loop - what differs is the system prompt and the auto-injected worklist. Prompts live in `prompts.py` for easy iteration.
 
-**Pipeline order: docs → bugs → tests.** Running bugs before tests avoids a chicken-and-egg problem. If tests are written against current (possibly buggy) behavior, they codify the bugs, and bugs-mode can't fix anything without breaking them. With this ordering, bugs-mode operates on cleaner code, and tests-mode writes tests against corrected behavior. However, depending on how you set up the prompts, the order could be shifted.
+**Pipeline order: docs → tests → bugs. Tests-mode writes assertions for intended behavior — what an endpoint named update_status should do, based on function names, docstrings, and HTTP conventions. So when tests run on buggy code, they fail by design. Those failing tests then become concrete signals for bugs-mode to fix. The alternative (bugs-first) would have bugs-mode operating with no test grounding, relying purely on the model spotting issues by reading code. Failing tests are the better signal.
 
 **FastAPI-aware test generation.** The tests prompt mandates `pytest-asyncio` + `httpx.AsyncClient` with `ASGITransport` for async endpoints. A common failure mode is using sync `TestClient` on async routes and getting confusing errors. Tautological tests (`assert x is not None`) are explicitly disallowed.
 
